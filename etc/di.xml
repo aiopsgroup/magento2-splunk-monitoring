@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- API -->
+    <preference for="Aiops\Monitoring\Api\LogInterface" type="Aiops\Monitoring\Model\Api\Log"/>
+    <preference for="Aiops\Monitoring\Api\CronjobStatusesInterface" type="Aiops\Monitoring\Model\Api\CronjobStatuses"/>
+
+    <preference for="Aiops\Monitoring\Api\CronRepositoryInterface" type="Aiops\Monitoring\Model\CronRepository"/>
+    <preference for="Aiops\Monitoring\Api\Data\CronInterface" type="Magento\Cron\Model\Schedule"/>
+    <preference for="Aiops\Monitoring\Api\Data\CronSearchResultInterface"
+                type="Aiops\Monitoring\Model\CronSearchResult"/>
+
+    <!-- Logger Handlers -->
+    <virtualType name="monitoringRequestHandler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/monitoring.log</argument>
+            <argument name="filesystem" xsi:type="object">Magento\Framework\Filesystem\Driver\File</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Custom Logger  -->
+    <virtualType name="CrmRequestLogger" type="Monolog\Logger">
+        <arguments>
+            <argument name="name" xsi:type="string">monitoring</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="system" xsi:type="object">monitoringRequestHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+</config>

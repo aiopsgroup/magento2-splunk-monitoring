@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <route url="/V1/monitoring/log" method="GET">
+        <service class="Aiops\Monitoring\Api\LogInterface" method="getLog" />
+        <resources>
+            <resource ref="Aiops_Monitoring::monitoring"/>
+        </resources>
+    </route>
+    <route url="/V1/monitoring/logFiles" method="GET">
+        <service class="Aiops\Monitoring\Api\LogInterface" method="getListoflogs" />
+        <resources>
+            <resource ref="Aiops_Monitoring::monitoring"/>
+        </resources>
+    </route>
+    <route url="/V1/monitoring/cronjobStatuses" method="GET">
+        <service class="Aiops\Monitoring\Api\CronjobStatusesInterface" method="getCronjobStatuses"/>
+        <resources>
+            <resource ref="Aiops_Monitoring::monitoring"/>
+        </resources>
+    </route>
+    <route url="/V1/monitoring/cronjobList" method="GET">
+        <service class="Aiops\Monitoring\Api\CronjobStatusesInterface" method="getCronjobList"/>
+        <resources>
+            <resource ref="Aiops_Monitoring::monitoring"/>
+        </resources>
+    </route>
+</routes>
