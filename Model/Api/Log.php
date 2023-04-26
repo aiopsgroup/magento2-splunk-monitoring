@@ -3,6 +3,7 @@
 namespace Aiops\Monitoring\Model\Api;
 
 use Aiops\Monitoring\Block\Splunk;
+use Exception;
 use Magento\Framework\Filesystem\Driver\File;
 use Magento\Framework\Filesystem\DirectoryList;
 use Magento\Framework\Exception\FileSystemException;
@@ -98,76 +99,63 @@ class Log
      * @param string $range
      * @return int|string
      */
-    public function getLog($filePath,$range)
+    public function getLog($filePath, $range)
     {
         try {
             if (!$this->splunk->isMonitoringEnabled()) {
                 return "Please enable and configure Splunk Monitoring Module";
             }
-            $filePathHeader = $this->request->getHeader('filePath');
-            $rangeHeader = $this->request->getHeader('Range');
-            if($rangeHeader) {
-                $range = $rangeHeader;
+
+            if (!preg_match("/^\d+-\d+$/", $range)) {
+                return "The 'range' parameter is either missing or has an incorrect format";
             }
-            if($filePathHeader) {
-                $filePath = $filePathHeader;
-            }
+
             if ($filePath == '') {
                 return "Please provide correct file name.";
             }
-            if(!$range) {
+            if (!$range) {
                 return "Please provide Byte Range in Correct Format like 10-500 or 500-2500 etc.";
             }
             return $this->getFileContents($filePath, $range);
-        } catch (FileSystemException $e) {
+        } catch (Exception $e) {
             $this->logger->error($e->getMessage());
             return $e->getMessage();
         }
     }
 
-
     /**
      * @param $filePath
      * @param $range
      * @return string|int
+     * @throws FileSystemException
      */
-    public function getFileContents($filePath, $range)
+    protected function getFileContents($filePath, $range)
     {
-        try {
-            $range_orig = '';
-            if($range) {
-                list($size_unit, $range_orig) = explode('=', $range, 2);
-            }
-            //figure out download piece from range (if set)
-            list($seek_start, $seek_end) = explode('-', $range_orig, 2);
-            $size = filesize($filePath);
-            $seek_end = (empty($seek_end)) ? ($size - 1) : min(abs(intval($seek_end)),($size - 1));
-            $seek_start = (empty($seek_start) || $seek_end < abs(intval($seek_start))) ? 0 : max(abs(intval($seek_start)),0);
+        list($seek_start, $seek_end) = explode('-', $range, 2);
+        $size = filesize($filePath);
+        $seek_end = (empty($seek_end)) ? ($size - 1) : min(abs(intval($seek_end)),($size - 1));
+        $seek_start = (empty($seek_start) || $seek_end < abs(intval($seek_start))) ? 0 : max(abs(intval($seek_start)),0);
 
-            $fileExt = pathinfo($filePath, PATHINFO_EXTENSION);
-            $readLength = (int)$seek_end - (int)$seek_start;
+        $fileExt = pathinfo($filePath, PATHINFO_EXTENSION);
+        $readLength = (int)$seek_end - (int)$seek_start;
 
-            if($readLength >= Log::MAX_FILE_SIZE_RETRIEVE) {
-                $readLength = Log::MAX_FILE_SIZE_RETRIEVE;
-            }
-
-            if ($fileExt == 'gz') {
-                $fileHandle = gzopen($filePath, 'rb');
-                fSeek($fileHandle, $seek_start);
-                $content = gzread($fileHandle, $readLength);
-                gzclose($fileHandle);
-            } else {
-                $fileHandle = $this->driverFile->fileOpen($filePath, 'rb');
-                $this->driverFile->fileSeek($fileHandle, $seek_start);
-                $content = $this->driverFile->fileRead($fileHandle, $readLength);
-                $this->driverFile->fileClose($fileHandle);
-
-            }
-            return $content;
-        } catch (FileSystemException $e) {
-            $this->logger->error($e->getMessage());
-            return $e->getMessage();
+        if($readLength >= Log::MAX_FILE_SIZE_RETRIEVE) {
+            $readLength = Log::MAX_FILE_SIZE_RETRIEVE;
         }
+
+        if ($fileExt == 'gz') {
+            $fileHandle = gzopen($filePath, 'rb');
+            fSeek($fileHandle, $seek_start);
+            $content = gzread($fileHandle, $readLength);
+            gzclose($fileHandle);
+        } else {
+            $fileHandle = $this->driverFile->fileOpen($filePath, 'rb');
+            $this->driverFile->fileSeek($fileHandle, $seek_start);
+            $content = $this->driverFile->fileRead($fileHandle, $readLength);
+            $this->driverFile->fileClose($fileHandle);
+
+        }
+        return $content;
     }
 
     /**
