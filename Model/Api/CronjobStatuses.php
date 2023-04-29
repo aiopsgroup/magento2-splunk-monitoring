@@ -11,13 +11,28 @@ use Magento\Framework\Api\SearchCriteriaInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Store\Model\ScopeInterface as ScopeInterfaceAlias;
 use Psr\Log\LoggerInterface;
-use Aiops\Monitoring\Block\Splunk;
+use Aiops\Monitoring\Helper\Splunk;
 
 class CronjobStatuses implements CronjobStatusesInterface
 {
+    /**
+     * @var CronRepository
+     */
     private CronRepository $cronRepository;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
+
+    /**
+     * @var ConfigInterface
+     */
     private ConfigInterface $config;
+
+    /**
+     * @var ScopeConfigInterface
+     */
     private ScopeConfigInterface $scopeConfig;
 
     /**
@@ -43,10 +58,12 @@ class CronjobStatuses implements CronjobStatusesInterface
         $this->logger = $logger;
         $this->config = $config;
         $this->scopeConfig = $scopeConfig;
-        $this->splunk      = $splunk;
+        $this->splunk = $splunk;
     }
 
     /**
+     * Get a cronjobs list using search criteria
+     *
      * @param SearchCriteriaInterface $searchCriteria
      * @return CronSearchResultInterface|string
      */
@@ -64,13 +81,13 @@ class CronjobStatuses implements CronjobStatusesInterface
     }
 
     /**
-     * @return array
+     * Get a list with all available cron jobs sorted by name
+     *
+     * @return array|string
      */
     public function getCronjobList()
     {
-
         $data = [];
-
         if (!$this->splunk->isMonitoringEnabled()) {
             return "Please enable and configure Splunk Monitoring Module";
         }

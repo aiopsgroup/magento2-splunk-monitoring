@@ -2,7 +2,7 @@
 
 namespace Aiops\Monitoring\Model\Api;
 
-use Aiops\Monitoring\Block\Splunk;
+use Aiops\Monitoring\Helper\Splunk;
 use Exception;
 use Magento\Framework\Filesystem\Driver\File;
 use Magento\Framework\Filesystem\DirectoryList;
@@ -10,13 +10,17 @@ use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Framework\App\Response\Http\FileFactory;
 use Magento\Cron\Model\ScheduleFactory;
-use Psr\Log\LoggerInterface;
 use Magento\Framework\Webapi\Rest\Request;
 use Magento\Framework\Webapi\Rest\Response;
+use Magento\Framework\Filesystem\Io\File as Io;
+use Magento\Framework\Archive\Helper\File\Gz as Gz;
+use Magento\Framework\File\Size;
 
-class Log
+class Log extends Gz
 {
-    const MAX_FILE_SIZE_RETRIEVE = 2097152; //2MB File Size
+    const LOGS_NOT_FOUND = "No Logs Files found in log directory";
+
+    const RANGE_ERROR = "Please provide Byte Range in Correct Format like 10-500 or 500-2500 etc.";
     /**
      * @var Request
      */
@@ -41,9 +45,14 @@ class Log
     protected File $driverFile;
 
     /**
-     * @var LoggerInterface
+     * @var Io
      */
-    protected LoggerInterface $logger;
+    protected Io $io;
+
+    /**
+     * @var Size
+     */
+    protected Size $size;
 
     /**
      * @var RawFactory
@@ -56,42 +65,36 @@ class Log
     protected FileFactory $fileFactory;
 
     /**
-     * @var ScheduleFactory
-     */
-    protected ScheduleFactory $_scheduleFactory;
-
-    /**
-     * Constructor.
      * @param DirectoryList $directoryList
      * @param File $driverFile
      * @param RawFactory $resultRawFactory
      * @param FileFactory $fileFactory
-     * @param ScheduleFactory $scheduleFactory
-     * @param LoggerInterface $logger
      * @param Splunk $splunk
      * @param Request $request
      * @param Response $response
+     * @param Io $io
+     * @param Size $size
      */
     public function __construct(
         DirectoryList   $directoryList,
         File            $driverFile,
         RawFactory      $resultRawFactory,
         FileFactory     $fileFactory,
-        ScheduleFactory $scheduleFactory,
-        LoggerInterface $logger,
         Splunk          $splunk,
         Request         $request,
-        Response        $response
+        Response        $response,
+        Io              $io,
+        Size            $size
     ) {
         $this->directoryList = $directoryList;
         $this->driverFile = $driverFile;
         $this->resultRawFactory = $resultRawFactory;
         $this->fileFactory = $fileFactory;
-        $this->_scheduleFactory = $scheduleFactory;
-        $this->logger = $logger;
         $this->splunk = $splunk;
         $this->request = $request;
         $this->response = $response;
+        $this->io = $io;
+        $this->size = $size;
     }
 
     /**
@@ -103,57 +106,57 @@ class Log
     {
         try {
             if (!$this->splunk->isMonitoringEnabled()) {
-                return "Please enable and configure Splunk Monitoring Module";
+                $this->splunk->setLogInfo(Splunk::MONITORING_ENABLED_MESSAGE);
+                return Splunk::MONITORING_ENABLED_MESSAGE;
             }
 
             if (!preg_match("/^\d+-\d+$/", $range)) {
-                return "The 'range' parameter is either missing or has an incorrect format";
+                return self::RANGE_ERROR;
             }
 
             if ($filePath == '') {
                 return "Please provide correct file name.";
             }
             if (!$range) {
-                return "Please provide Byte Range in Correct Format like 10-500 or 500-2500 etc.";
+                return self::RANGE_ERROR;
             }
             return $this->getFileContents($filePath, $range);
         } catch (Exception $e) {
-            $this->logger->error($e->getMessage());
+            $this->splunk->setLogCritical($e->getMessage());
             return $e->getMessage();
         }
     }
 
     /**
-     * @param $filePath
-     * @param $range
-     * @return string|int
+     * @param string $filePath
+     * @param string $range
+     * @return string
      * @throws FileSystemException
      */
-    protected function getFileContents($filePath, $range)
+    protected function getFileContents(string $filePath, string $range)
     {
         list($seek_start, $seek_end) = explode('-', $range, 2);
         $size = filesize($filePath);
-        $seek_end = (empty($seek_end)) ? ($size - 1) : min(abs(intval($seek_end)),($size - 1));
-        $seek_start = (empty($seek_start) || $seek_end < abs(intval($seek_start))) ? 0 : max(abs(intval($seek_start)),0);
+        $seek_end = (empty($seek_end)) ? ($size - 1) : min(abs((int)$seek_end), ($size - 1));
+        $seek_start = (empty($seek_start) || $seek_end < abs((int)$seek_start)) ? 0 : max(abs((int)$seek_start), 0);
 
-        $fileExt = pathinfo($filePath, PATHINFO_EXTENSION);
+        $fileExt = $this->io->getPathInfo($filePath);
         $readLength = (int)$seek_end - (int)$seek_start;
-
-        if($readLength >= Log::MAX_FILE_SIZE_RETRIEVE) {
-            $readLength = Log::MAX_FILE_SIZE_RETRIEVE;
+        $maxFileSize = $this->size->getMaxFileSize();
+        if ($readLength >= $maxFileSize) {
+            $readLength = $maxFileSize;
         }
 
         if ($fileExt == 'gz') {
-            $fileHandle = gzopen($filePath, 'rb');
-            fSeek($fileHandle, $seek_start);
-            $content = gzread($fileHandle, $readLength);
-            gzclose($fileHandle);
+            $fileHandle = Gz::_open($filePath, 'rb');
+            $this->driverFile->fileSeek($fileHandle, $seek_start);
+            $content = Gz::_read($fileHandle, $readLength);
+            Gz::_close($fileHandle);
         } else {
             $fileHandle = $this->driverFile->fileOpen($filePath, 'rb');
             $this->driverFile->fileSeek($fileHandle, $seek_start);
             $content = $this->driverFile->fileRead($fileHandle, $readLength);
             $this->driverFile->fileClose($fileHandle);
-
         }
         return $content;
     }
@@ -166,7 +169,8 @@ class Log
         $list = [];
         try {
             if (!$this->splunk->isMonitoringEnabled()) {
-                return "Please enable and configure Splunk Monitoring Module";
+                $this->splunk->setLogInfo(Splunk::MONITORING_ENABLED_MESSAGE);
+                return Splunk::MONITORING_ENABLED_MESSAGE;
             }
             $directoryPath = $this->directoryList->getPath('log');
             if (!$this->driverFile->isExists($directoryPath)) {
@@ -174,7 +178,8 @@ class Log
             }
             $files = $this->driverFile->readDirectoryRecursively($directoryPath);
             if (count($files) < 1) {
-                return "No Logs Files found in log directory";
+                $this->splunk->setLogInfo(self::LOGS_NOT_FOUND);
+                return self::LOGS_NOT_FOUND;
             }
             foreach ($files as $file) {
                 if ($this->driverFile->isFile($file)) {
@@ -182,7 +187,7 @@ class Log
                 }
             }
         } catch (Exception|FileSystemException $e) {
-            $this->logger->error($e->getMessage());
+            $this->splunk->setLogCritical($e->getMessage());
             $list = $e->getMessage();
         }
         return $list;

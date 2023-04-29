@@ -8,11 +8,11 @@
     ],
     "authors": [
         {
-            "name": "AiopsGroup",
-            "email": "adhiman@aiopsgroup.com"
+            "name": "AiopsGroup Monitoring",
+            "email": "aiopsmonitoring@aiopsgroup.com"
         }
     ],
-    "version": "1.0.1",
+    "version": "1.0.0",
     "autoload": {
         "files": [
             "registration.php"
