@@ -1,6 +1,6 @@
 {
     "name": "aiopsgroup/magento2-splunk-monitoring",
-    "description": "Splunk Magento Monitoring Module",
+    "description": "AIOPSMonitoring Extension for Splunk Cloud",
     "type": "magento2-module",
     "license": [
         "OSL-3.0",
