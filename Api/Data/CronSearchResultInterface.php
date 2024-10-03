@@ -1,8 +1,8 @@
 <?php
 /**
  *
- * @author    AIOPS Group <developer@aiopsgroup.com>
- * @copyright 2023 AIOPS Group Support
+ * @author    AIOPS Group <aiopsmonitoring@aiopsgroup.com>
+ * @copyright 2024 AIOPS Group Support
  */
 
 namespace Aiops\Monitoring\Api\Data;

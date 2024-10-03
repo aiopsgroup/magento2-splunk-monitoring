@@ -1,4 +1,4 @@
-﻿**AIOPSMonitoring** provides insights about log messages and order events as well as dashboards and alerts based on 100+ business KPIs.
+﻿**CX Monitoring** provides insights about log messages and order events as well as dashboards and alerts based on 100+ business KPIs.
 For a free evaluation please contact us at <sales@aiopsgroup.com>
 
 **How to Install Splunk Cloud Monitoring Extension:**
